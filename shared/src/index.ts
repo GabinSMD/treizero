@@ -32,6 +32,7 @@ export * from './engine/inscritsExport';
 export * from './engine/indemnites';
 export * from './engine/licenceEtrangere';
 export * from './engine/licenceQr';
+export * from './engine/scanInscription';
 export * from './engine/licences';
 export * from './engine/licencesImport';
 export * from './engine/fraicheurLicencies';

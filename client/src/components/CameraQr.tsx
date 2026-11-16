@@ -1,5 +1,6 @@
 import { Camera, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { decoderImageQr } from '../lib/qr';
 
 interface Props {
   /** Contenu brut d'un QR lu. Un même code n'est rendu qu'une fois en 2,5 s. */
@@ -10,8 +11,9 @@ interface Props {
  * Lecture de QR code à la caméra, pour l'inscription comme pour le dépôt des
  * licences (manuel §3.B.2, §3.C).
  *
- * `BarcodeDetector` quand le navigateur l'offre (Chrome, Android), sinon jsQR,
- * embarqué dans l'application, donc fonctionnel hors ligne.
+ * Le décodage est celui de `decoderImageQr` : `BarcodeDetector` quand le
+ * navigateur l'offre (Chrome, Android), sinon jsQR, embarqué dans
+ * l'application, donc fonctionnel hors ligne.
  *
  * `onCode` est relu à chaque image via une référence : la boucle de lecture
  * démarre une fois, et un rappel capturé au démarrage travaillerait sur l'état
@@ -28,12 +30,6 @@ export function CameraQr({ onCode }: Props) {
   const dernier = useRef<{ contenu: string; at: number }>({ contenu: '', at: 0 });
   const rappel = useRef(onCode);
   rappel.current = onCode;
-  /**
-   * jsQR n'est chargé qu'au moment où le repli est nécessaire : il pèse
-   * 140 Ko, inutiles pour qui n'ouvre jamais la caméra. Le morceau est
-   * précaché par le service worker, donc disponible hors ligne ensuite.
-   */
-  const jsQr = useRef<typeof import('jsqr').default | null>(null);
 
   const arreter = (): void => {
     if (boucle.current !== null) {
@@ -54,40 +50,15 @@ export function CameraQr({ onCode }: Props) {
   };
 
   const lireImages = (): void => {
-    const Detector = (
-      window as unknown as {
-        BarcodeDetector?: new (o: { formats: string[] }) => {
-          detect: (s: CanvasImageSource) => Promise<{ rawValue: string }[]>;
-        };
-      }
-    ).BarcodeDetector;
-    const detecteur = Detector ? new Detector({ formats: ['qr_code'] }) : null;
-
     const tick = async (): Promise<void> => {
       const v = video.current;
       const c = canvas.current;
-      if (!v || !c || v.readyState !== v.HAVE_ENOUGH_DATA) {
-        boucle.current = requestAnimationFrame(() => void tick());
-        return;
-      }
-      c.width = v.videoWidth;
-      c.height = v.videoHeight;
-      const ctx = c.getContext('2d', { willReadFrequently: true });
-      if (ctx) {
-        ctx.drawImage(v, 0, 0, c.width, c.height);
-        try {
-          if (detecteur) {
-            const codes = await detecteur.detect(c);
-            if (codes[0]?.rawValue) lu(codes[0].rawValue);
-          } else {
-            if (!jsQr.current) jsQr.current = (await import('jsqr')).default;
-            const image = ctx.getImageData(0, 0, c.width, c.height);
-            const code = jsQr.current(image.data, image.width, image.height);
-            if (code?.data) lu(code.data);
-          }
-        } catch {
-          /* image illisible : on tentera la suivante */
-        }
+      if (v && c && v.readyState === v.HAVE_ENOUGH_DATA) {
+        c.width = v.videoWidth;
+        c.height = v.videoHeight;
+        c.getContext('2d', { willReadFrequently: true })?.drawImage(v, 0, 0, c.width, c.height);
+        const contenu = await decoderImageQr(c);
+        if (contenu) lu(contenu);
       }
       // Arrêtée entre-temps : ne pas relancer la boucle.
       if (flux.current) boucle.current = requestAnimationFrame(() => void tick());

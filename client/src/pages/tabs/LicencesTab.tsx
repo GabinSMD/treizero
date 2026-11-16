@@ -22,6 +22,7 @@ import {
 } from '../../db/actions';
 import { useLicencies } from '../../db/hooks';
 import { CameraQr } from '../../components/CameraQr';
+import { useCaptureDouchette } from '../../lib/douchette';
 import { FraicheurBase } from '../../components/FraicheurBase';
 import {
   ANOMALIE_EQUIPE_LABELS,
@@ -110,6 +111,7 @@ export function LicencesTab({ concours, teams }: Props) {
     null,
   );
   const champScan = useRef<HTMLInputElement>(null);
+  useCaptureDouchette(champScan, (c) => setSaisie((s) => s + c));
 
   const attendues = teams.filter((t) => !t.forfait);
   const visibles = attendues.filter((t) => {

@@ -29,6 +29,33 @@ const CLES_PRENOM = ['prenom', 'firstname'];
 
 const chiffres = (s: string): string => s.replace(/[\s.\-/]/g, '');
 
+/**
+ * Touches de la rangée des chiffres d'un clavier AZERTY, sans Maj, de 1 à 0.
+ * Une douchette réglée en QWERTY (le réglage d'usine) envoie les codes de ces
+ * touches pour écrire des chiffres : branchée sur un poste français, elle
+ * « tape » donc `&é"'(-è_çà` au lieu de `1234567890`. Le piège est courant, et
+ * le reconfigurer demande de scanner les codes-barres de son manuel, que la
+ * table de marque n'a jamais sous la main le jour du concours.
+ */
+const RANGEE_AZERTY = '&é"\'(-è_çà';
+
+/**
+ * Rétablit les chiffres d'une saisie faite par une douchette QWERTY sur un
+ * clavier AZERTY. Ne touche qu'une saisie faite **uniquement** de ces touches
+ * (et de ponctuation de licence) : `l'équipe` ou un nom à accent restent tels
+ * quels.
+ */
+function depuisRangeeAzerty(texte: string): string | null {
+  if (!/^[&é"'(\-è_çà\s.]+$/.test(texte) || !/[&é"'(è_çà]/.test(texte)) return null;
+  let sortie = '';
+  for (const c of texte) {
+    const i = RANGEE_AZERTY.indexOf(c);
+    // `-` est à la fois le 6 et un séparateur : dans cette rangée, c'est le 6.
+    sortie += i >= 0 ? String((i + 1) % 10) : c;
+  }
+  return sortie;
+}
+
 const normCle = (s: string): string =>
   s
     .toLowerCase()
@@ -139,6 +166,9 @@ function depuisUrl(texte: string): Partial<LicenceQr> | null {
 export function parseLicenceQr(contenu: string): LicenceQr | null {
   const brut = contenu.trim();
   if (!brut) return null;
+
+  const azerty = depuisRangeeAzerty(brut);
+  if (azerty && estLicence(azerty)) return { licence: chiffres(azerty), brut };
 
   const champs = brut.split(/[;|,\t\n]+/);
   const trouve =

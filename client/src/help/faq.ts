@@ -456,6 +456,21 @@ export const FAQ: FaqEntry[] = [
     ],
   },
   {
+    id: 'lecteur-licences',
+    category: 'Démarrer',
+    question: 'Comment inscrire les équipes en scannant les licences ?',
+    keywords: ['scanner', 'scan', 'qr', 'licence', 'douchette', 'lecteur', 'camera', 'tablette', 'a la volee'],
+    steps: [
+      'Onglet « Équipes » → « Inscrire au lecteur de licences » (dans « Plus », ou directement « Au lecteur de licences » en concours officiel).',
+      'Scannez les licences l\'une après l\'autre : avec la caméra de la tablette (« Utiliser la caméra »), ou avec une douchette USB ou Bluetooth.',
+      'Avec « À la volée » coché, l\'équipe est inscrite dès que la formation est complète, et le joueur suivant ouvre l\'équipe suivante.',
+    ],
+    note:
+      'Une douchette n\'a pas besoin que le champ soit sélectionné : la licence y revient d\'elle-même. ' +
+      'Réglée en clavier américain, elle écrit « &é"\'(… » au lieu des chiffres sur un poste français : ' +
+      'le numéro est rétabli tout seul. La caméra fonctionne sans réseau.',
+  },
+  {
     id: 'inviter-club',
     category: 'Démarrer',
     question: 'Comment ajouter un co-organisateur (compte club) ?',

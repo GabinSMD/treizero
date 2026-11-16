@@ -34,6 +34,21 @@ import type { Nouveaute } from '@shared';
  */
 export const JOURNAL: Nouveaute<LucideIcon>[] = [
   {
+    version: '0.6.1',
+    date: '2026-11-16',
+    items: [
+      {
+        icone: IdCard,
+        titre: 'Le lecteur de licences ne perd plus un scan',
+        texte:
+          'Une douchette n\'a plus besoin que le champ soit sélectionné : après un clic ' +
+          'ailleurs, la licence suivante y revient d\'elle-même. Et une douchette réglée en ' +
+          'clavier américain, qui écrit « &é"\'(… » sur un poste français, donne de nouveau ' +
+          'le bon numéro.',
+      },
+    ],
+  },
+  {
     version: '0.6.0',
     date: '2026-11-12',
     items: [

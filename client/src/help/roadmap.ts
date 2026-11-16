@@ -1,4 +1,4 @@
-import { IdCard, Upload, type LucideIcon } from 'lucide-react';
+import { Upload, type LucideIcon } from 'lucide-react';
 /**
  * Ce qui est engagé pour la suite, tel qu'on l'annonce publiquement.
  *
@@ -23,16 +23,6 @@ export interface ChantierRoadmap {
 }
 
 export const ROADMAP: ChantierRoadmap[] = [
-  {
-    icone: IdCard,
-    titre: 'Inscrire une équipe en scannant les licences',
-    texte:
-      'Le QR code d’une licence contient déjà le numéro du licencié. Le lire avec ' +
-      'la caméra d’une tablette — ou une douchette USB — pour inscrire un joueur ' +
-      'sans rien retaper, et faire le dépôt des licences à la volée pendant que ' +
-      'la file avance.',
-    issue: 8,
-  },
   {
     icone: Upload,
     titre: 'Remonter les résultats au comité sans ressaisie',

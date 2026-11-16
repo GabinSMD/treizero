@@ -230,11 +230,14 @@ export function ChatBot() {
   const categories = [...new Set(FAQ.map((e) => e.category))];
   /** Aucune question encore posée : le sommaire a sa place. Après, non. */
   const vierge = !messages.some((m) => m.role === 'user');
+  const effacee = useEffaceeAuDefilement();
 
   return (
     <>
       <button
-        className={`help-fab no-print${open ? ' help-fab-open' : ''}`}
+        className={`help-fab no-print${open ? ' help-fab-open' : ''}${
+          effacee && !open ? ' help-fab-cache' : ''
+        }`}
         data-tour="help"
         onClick={() => setOpen(!open)}
         aria-label={open ? 'Fermer l\'assistant' : 'Ouvrir l\'assistant'}
@@ -396,4 +399,41 @@ function FaqAnswer({
       </div>
     </div>
   );
+}
+
+/** Défilement (en px) qu'il faut dans un sens pour changer d'avis. */
+const SEUIL_DEFILEMENT = 24;
+
+/**
+ * La bulle est fixée dans un coin et passait par-dessus ce qu'on lisait : un
+ * champ du formulaire d'inscription sur téléphone, le nom d'une équipe sur
+ * tablette. Elle s'efface donc quand on descend dans la page — c'est qu'on
+ * lit — et revient dès qu'on remonte, ainsi qu'en haut et en bas de page, où
+ * une marge lui est réservée.
+ */
+function useEffaceeAuDefilement(): boolean {
+  const [effacee, setEffacee] = useState(false);
+  useEffect(() => {
+    let ancre = window.scrollY;
+    const suivre = () => {
+      const y = window.scrollY;
+      const enBas =
+        window.innerHeight + y >= document.documentElement.scrollHeight - 8;
+      if (y < 80 || enBas) {
+        setEffacee(false);
+        ancre = y;
+        return;
+      }
+      if (y - ancre > SEUIL_DEFILEMENT) {
+        setEffacee(true);
+        ancre = y;
+      } else if (ancre - y > SEUIL_DEFILEMENT) {
+        setEffacee(false);
+        ancre = y;
+      }
+    };
+    window.addEventListener('scroll', suivre, { passive: true });
+    return () => window.removeEventListener('scroll', suivre);
+  }, []);
+  return effacee;
 }

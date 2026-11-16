@@ -1,5 +1,5 @@
 import { Icone } from '../components/Icone';
-import { Crosshair, Dices, Flag, IdCard, LayoutGrid, Link2, ListOrdered, PartyPopper, PenLine, Printer, RefreshCw, Settings, Target, Timer, TriangleAlert, Trophy, Tv, Users, type LucideIcon } from 'lucide-react';
+import { Crosshair, Dices, Ellipsis, Flag, IdCard, LayoutGrid, Link2, ListOrdered, PartyPopper, PenLine, Printer, RefreshCw, Settings, Target, Timer, TriangleAlert, Trophy, Tv, Users, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { Concours, ConcoursStatus, Match, Poule, Team } from '@shared';
@@ -21,6 +21,8 @@ import { Modal } from '../components/Modal';
 import { QuickScore } from '../components/QuickScore';
 import { RoundTimer } from '../components/RoundTimer';
 import { ShareModal } from '../components/ShareModal';
+import { MenuPlus, MenuPlusItem } from '../components/MenuPlus';
+import { useTelephone } from '../lib/ecran';
 import { useCallNotifier } from '../lib/notifier';
 import {
   DISCIPLINE_LABELS,
@@ -74,6 +76,7 @@ export function ConcoursPage() {
   const matches = useMatches(id);
   const [editing, setEditing] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const telephone = useTelephone();
   useCallNotifier(concours, teams ?? [], poules ?? [], matches ?? []);
 
   if (!concours) {
@@ -89,13 +92,22 @@ export function ConcoursPage() {
   const rondesMode = isRondesMode(concours.mode);
   const tirMode = isTirMode(concours.mode);
   const controleLicences = aDesCriteresLicence(concours);
-  const tabs = [
+  const tabs: {
+    key: string;
+    icon: LucideIcon;
+    label: string;
+    /** Libellé de la barre du bas, sur téléphone : un seul mot. */
+    court?: string;
+    compte?: number;
+  }[] = [
     {
       key: 'equipes',
       icon: Users,
       label: `${
         tirMode ? 'Tireurs' : isIndividualMode(concours.mode) ? 'Participants' : 'Équipes'
       } (${teams?.length ?? 0})`,
+      court: tirMode ? 'Tireurs' : isIndividualMode(concours.mode) ? 'Joueurs' : 'Équipes',
+      compte: teams?.length ?? 0,
     },
     ...(concours.mode === 'poules' ? [{ key: 'poules', icon: Dices, label: 'Poules' }] : []),
     ...(tirMode
@@ -106,7 +118,7 @@ export function ConcoursPage() {
             // Les phases finales d'un concours en rondes (manuel §3.D.15) :
             // l'onglet n'apparaît que quand le tableau existe.
             ...((matches ?? []).some((m) => m.stage !== 'ronde')
-              ? [{ key: 'tableau', icon: Trophy, label: 'Phases finales' }]
+              ? [{ key: 'tableau', icon: Trophy, label: 'Phases finales', court: 'Finales' }]
               : []),
           ]
         : [{ key: 'tableau', icon: Trophy, label: 'Tableau' }]),
@@ -145,37 +157,81 @@ export function ConcoursPage() {
           <span className={`status-chip status-${concours.status}`}>
             {statusLabel(concours.mode, concours.status)}
           </span>
-          <button
-            className="btn btn-ghost btn-sm"
-            data-tour="params"
-            onClick={() => setEditing(true)}
-          >
-            <Settings className="ic" aria-hidden /> Paramètres
-          </button>
-          <a
-            className="btn btn-ghost btn-sm"
-            data-tour="affichage"
-            href={`/concours/${concours.id}/affichage`}
-            target="_blank"
-            rel="noreferrer"
-            title="Affichage public (TV / vidéoprojecteur)"
-          >
-            <Tv className="ic" aria-hidden /> Affichage
-          </a>
-          <button
-            className="btn btn-ghost btn-sm"
-            data-tour="share"
-            onClick={() => setSharing(true)}
-          >
-            <Link2 className="ic" aria-hidden /> Partager
-          </button>
-          <button
-            className="btn btn-ghost btn-sm"
-            data-tour="imprimer"
-            onClick={() => window.print()}
-          >
-            <Printer className="ic" aria-hidden /> Imprimer
-          </button>
+          {telephone ? (
+            // Sur téléphone, quatre boutons prenaient deux lignes avant même la
+            // première partie : on les range dans un seul menu.
+            <MenuPlus
+              libelle="Actions"
+              icone={<Ellipsis className="ic" aria-hidden />}
+              ariaLabel="Actions du concours"
+              className="concours-menu"
+            >
+              <MenuPlusItem
+                tour="params"
+                icone={<Settings className="ic" aria-hidden />}
+                titre="Paramètres"
+                detail="Nom, date, terrains, points, consolante."
+                onClick={() => setEditing(true)}
+              />
+              <MenuPlusItem
+                tour="affichage"
+                icone={<Tv className="ic" aria-hidden />}
+                titre="Affichage public"
+                detail="Pour une TV ou un vidéoprojecteur, dans un nouvel onglet."
+                onClick={() =>
+                  window.open(`/concours/${concours.id}/affichage`, '_blank', 'noopener')
+                }
+              />
+              <MenuPlusItem
+                tour="share"
+                icone={<Link2 className="ic" aria-hidden />}
+                titre="Partager"
+                detail="Lien et QR code pour que les joueurs suivent le concours."
+                onClick={() => setSharing(true)}
+              />
+              <MenuPlusItem
+                tour="imprimer"
+                icone={<Printer className="ic" aria-hidden />}
+                titre="Imprimer"
+                detail="L'écran affiché, mis en page pour le papier."
+                onClick={() => window.print()}
+              />
+            </MenuPlus>
+          ) : (
+            <>
+              <button
+                className="btn btn-ghost btn-sm"
+                data-tour="params"
+                onClick={() => setEditing(true)}
+              >
+                <Settings className="ic" aria-hidden /> Paramètres
+              </button>
+              <a
+                className="btn btn-ghost btn-sm"
+                data-tour="affichage"
+                href={`/concours/${concours.id}/affichage`}
+                target="_blank"
+                rel="noreferrer"
+                title="Affichage public (TV / vidéoprojecteur)"
+              >
+                <Tv className="ic" aria-hidden /> Affichage
+              </a>
+              <button
+                className="btn btn-ghost btn-sm"
+                data-tour="share"
+                onClick={() => setSharing(true)}
+              >
+                <Link2 className="ic" aria-hidden /> Partager
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                data-tour="imprimer"
+                onClick={() => window.print()}
+              >
+                <Printer className="ic" aria-hidden /> Imprimer
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -208,21 +264,40 @@ export function ConcoursPage() {
         />
       )}
 
-      <nav className="tabs no-print" data-tour="tabs">
+      {/* Sur téléphone, la barre d'onglets se fixe en bas de l'écran : tous les
+          onglets restent visibles et à portée du pouce, quel que soit le
+          défilement. Ailleurs, elle reste sous l'en-tête. */}
+      <nav
+        className={telephone ? 'tabs tabs-concours tabs-bas no-print' : 'tabs tabs-concours no-print'}
+        data-tour="tabs"
+        aria-label="Étapes du concours"
+      >
         {tabs.map((t) => (
           <button
             key={t.key}
             className={active === t.key ? 'tab active' : 'tab'}
             aria-current={active === t.key ? 'page' : undefined}
-            // Sur téléphone la barre défile : l'onglet ouvert doit rester en vue,
+            aria-label={telephone && t.court ? t.label : undefined}
+            // La barre du haut défile : l'onglet ouvert doit rester en vue,
             // sinon on ne sait plus où l'on est. On ne touche qu'au défilement
             // horizontal de la barre — jamais à celui de la page.
-            ref={active === t.key ? garderOngletVisible : undefined}
+            ref={active === t.key && !telephone ? garderOngletVisible : undefined}
             data-tour={`tab-${t.key}`}
             onClick={() => navigate(`/concours/${concours.id}/${t.key}`, { replace: true })}
           >
             <t.icon className="tab-icon" aria-hidden strokeWidth={2} />
-            {t.label}
+            {telephone ? (
+              <span className="tab-court">
+                {t.court ?? t.label}
+                {t.compte !== undefined && (
+                  <span className="tab-compte" aria-hidden>
+                    {t.compte}
+                  </span>
+                )}
+              </span>
+            ) : (
+              t.label
+            )}
           </button>
         ))}
       </nav>
@@ -496,7 +571,8 @@ function NextStepBanner({
       <span className="next-step-text">{step.text}</span>
       {step.tab && step.tab !== activeTab && (
         <button className="btn btn-sm next-step-go" onClick={() => onGo(step.tab!)}>
-          Aller à l'onglet {TAB_NAMES[step.tab] ?? step.tab} →
+          <span className="masque-telephone">Aller à l'onglet </span>
+          {TAB_NAMES[step.tab] ?? step.tab} →
         </button>
       )}
     </div>

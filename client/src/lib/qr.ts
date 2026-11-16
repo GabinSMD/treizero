@@ -3,12 +3,10 @@
  *
  * `BarcodeDetector` quand le navigateur l'offre (Chrome, Android) ; sinon jsQR,
  * embarqué dans l'application et chargé seulement au moment du repli — il pèse
- * lourd, et un navigateur sur trois n'en a pas besoin.
+ * lourd, et un navigateur sur trois n'en a pas besoin. Le morceau est précaché
+ * par le service worker, donc disponible hors ligne ensuite.
  *
- * Le lecteur de licences (`LicenceScanModal`) garde pour l'instant sa propre
- * copie de cette boucle : elle ne se vérifie qu'avec une vraie caméra, et je ne
- * refais pas à l'aveugle un code qui fonctionne. À réunir dans un lot où la
- * caméra peut être éprouvée.
+ * Servi au lecteur de licences (`CameraQr`) comme à l'échange de compositions.
  */
 
 type Detecteur = { detect: (s: CanvasImageSource) => Promise<{ rawValue: string }[]> };

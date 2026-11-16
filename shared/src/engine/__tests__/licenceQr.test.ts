@@ -60,4 +60,17 @@ describe('décodage du contenu d un QR code de licence', () => {
     const r = parseLicenceQr('club=0266013;licence=02635624');
     expect(r?.licence).toBe('02635624');
   });
+
+  it('douchette QWERTY branchée sur un poste AZERTY : les chiffres sont rétablis', () => {
+    // 02635624 tapé sur la rangée des chiffres sans Maj.
+    const r = parseLicenceQr('àé-"(-é\'');
+    expect(r?.licence).toBe('02635624');
+    expect(r?.brut).toBe('àé-"(-é\'');
+    expect(parseLicenceQr('&é"\'(-è_çà')?.licence).toBe('1234567890');
+  });
+
+  it('la rangée AZERTY ne transforme ni un texte ni une saisie trop courte', () => {
+    expect(parseLicenceQr("l'équipe")?.licence).toBeUndefined();
+    expect(parseLicenceQr('&é"\'')?.licence).toBeUndefined();
+  });
 });

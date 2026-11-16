@@ -10,6 +10,7 @@ import {
 } from '@shared';
 import { addTeam } from '../db/actions';
 import { useLicencies } from '../db/hooks';
+import { useCaptureDouchette } from '../lib/douchette';
 import { ANOMALIE_EQUIPE_LABELS, ANOMALIE_LABELS } from '../lib/labels';
 import { CameraQr } from './CameraQr';
 import { Modal } from './Modal';
@@ -79,6 +80,7 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
   useEffect(() => {
     champ.current?.focus();
   }, []);
+  useCaptureDouchette(champ, (c) => setSaisie((s) => s + c));
 
   /* ----------------------------- Traitement ----------------------------- */
 

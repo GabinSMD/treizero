@@ -87,6 +87,14 @@ describe('fichier des licenciés', () => {
       'attention',
     );
   });
+
+  it('ne dit rien tant que la base n est pas lue', () => {
+    // La lecture d'une grosse base prend plusieurs secondes : ce n'est pas une
+    // base vide, et le compteur ne doit pas compter ce point.
+    expect(
+      point(pointsVeille(entree({ concours: officiel, fraicheur: undefined })), 'licencies'),
+    ).toBeUndefined();
+  });
 });
 
 describe('terrains', () => {

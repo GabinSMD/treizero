@@ -15,7 +15,7 @@ import { useFraicheurLicencies } from '../db/hooks';
  */
 export function FraicheurBase({ compact = false }: { compact?: boolean }) {
   const f = useFraicheurLicencies();
-  if (f.nombre === 0) return null;
+  if (!f || f.nombre === 0) return null;
   if (compact && !f.perimee) return null;
 
   const date = f.date ? new Date(f.date).toLocaleDateString('fr-FR') : null;

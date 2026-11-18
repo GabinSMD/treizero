@@ -46,7 +46,12 @@ export interface EntreeVeille {
   concours: Concours;
   /** Équipes engagées, forfaits exclus. */
   equipesEngagees: number;
-  fraicheur: FraicheurLicencies;
+  /**
+   * `undefined` = la base n'est pas encore lue. Sur 3 000 fiches, la lecture
+   * prend plusieurs secondes : la prendre pour une base vide afficherait
+   * « aucun fichier » à chaque ouverture du concours.
+   */
+  fraicheur: FraicheurLicencies | undefined;
   /** Un service worker contrôle-t-il la page ? Sans lui, pas d'ouverture hors réseau. */
   serviceWorker: boolean;
   /** `null` = le navigateur n'a pas encore répondu. */
@@ -68,8 +73,10 @@ export function pointsVeille(e: EntreeVeille): PointVeille[] {
 
   // Le fichier ne sert qu'aux contrôles fédéraux : un concours de club n'a pas
   // à s'en soucier.
-  if (estConcoursOfficiel(concours)) {
-    const f = e.fraicheur;
+  // Tant que la base n'est pas lue, le point n'apparaît pas : ni fausse
+  // alerte, ni point de trop au compteur.
+  const f = e.fraicheur;
+  if (estConcoursOfficiel(concours) && f) {
     // Une date illisible ne déclenche rien, comme ailleurs : absence de preuve
     // n'est pas preuve de péremption. L'absence de fichier, elle, rend tout
     // contrôle impossible.

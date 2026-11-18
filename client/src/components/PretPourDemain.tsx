@@ -23,7 +23,7 @@ interface Memoire {
  * Ce qui est coché reste sur cet appareil, par concours : c'est la check-list
  * de celui qui prépare, pas une donnée du concours à synchroniser.
  */
-const cle = (concoursId: string) => `veille.${concoursId}`;
+const cle = (concoursId: string) => `petanque.veille.${concoursId}`;
 
 function lire(concoursId: string): Memoire {
   try {

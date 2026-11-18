@@ -58,6 +58,7 @@ export * from './engine/rondeSupplementaire';
 export * from './engine/parcoursCatalogue';
 export * from './engine/replication';
 export * from './engine/retards';
+export * from './engine/veilleConcours';
 export * from './engine/statistiquesPoules';
 export * from './engine/sauvegarde';
 export * from './engine/fusionSauvegarde';

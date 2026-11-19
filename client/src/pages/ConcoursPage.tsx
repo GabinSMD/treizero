@@ -16,6 +16,7 @@ import { updateConcours } from '../db/actions';
 import { useConcours, useMatches, usePoules, useTeams } from '../db/hooks';
 import { ConcoursForm } from '../components/ConcoursForm';
 import { LienMultisite } from '../components/LienMultisite';
+import { PretPourDemain } from '../components/PretPourDemain';
 import { DeclarationsWatch } from '../components/DeclarationsWatch';
 import { Modal } from '../components/Modal';
 import { QuickScore } from '../components/QuickScore';
@@ -190,6 +191,12 @@ export function ConcoursPage() {
         matches={matches ?? []}
         activeTab={active}
         onGo={(tab) => navigate(`/concours/${concours.id}/${tab}`, { replace: true })}
+      />
+
+      <PretPourDemain
+        concours={concours}
+        teams={teams ?? []}
+        onParametres={() => setEditing(true)}
       />
 
       <DeclarationsWatch

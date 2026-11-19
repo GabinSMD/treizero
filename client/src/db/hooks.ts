@@ -135,21 +135,22 @@ export function useLicenciesCount(): number {
  * **pierres tombales** d'une purge précédente, et l'écran annoncerait plus de
  * fiches qu'il n'y en a. Trouvé en vérifiant dans l'application, où dix lignes
  * répondaient pour deux licenciés.
+ *
+ * `undefined` tant que la lecture n'a pas répondu : sur une base de quelques
+ * milliers de fiches, elle prend plusieurs secondes, et une base « vide » par
+ * défaut faisait annoncer « aucun fichier » pendant tout ce temps.
  */
-export function useFraicheurLicencies(): FraicheurLicencies {
-  const vide = fraicheurLicencies(undefined, 0, new Date().toISOString());
-  return (
-    useLiveQuery(async () => {
-      const dates: { updatedAt: string }[] = [];
-      await db.entities
-        .where('[type+concoursId]')
-        .equals(['licencie', ''])
-        .each((r) => {
-          if (r.deleted === 0) dates.push({ updatedAt: r.updatedAt });
-        });
-      return fraicheurLicencies(dateDeLaBase(dates), dates.length, new Date().toISOString());
-    }, []) ?? vide
-  );
+export function useFraicheurLicencies(): FraicheurLicencies | undefined {
+  return useLiveQuery(async () => {
+    const dates: { updatedAt: string }[] = [];
+    await db.entities
+      .where('[type+concoursId]')
+      .equals(['licencie', ''])
+      .each((r) => {
+        if (r.deleted === 0) dates.push({ updatedAt: r.updatedAt });
+      });
+    return fraicheurLicencies(dateDeLaBase(dates), dates.length, new Date().toISOString());
+  }, []);
 }
 
 /** Feuilles de match du club, la plus récente d'abord. */

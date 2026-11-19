@@ -78,6 +78,8 @@ function ParcoursOverlay() {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [attenteMs, setAttenteMs] = useState(0);
   const debutEtape = useRef<number>(0);
+  /** Étape pour laquelle on a déjà ouvert le menu qui contient la cible. */
+  const menuOuvertPour = useRef<unknown>(null);
 
   // Arrêter le parcours prévient le magasin, donc le composant parent : à faire
   // en dehors d'un calcul de rendu, jamais depuis un `setIdx(i => …)`.
@@ -131,6 +133,17 @@ function ParcoursOverlay() {
       return;
     }
     const el = document.querySelector(etape.cible);
+    // Sur téléphone, les actions du concours sont rangées dans un menu : une
+    // cible qui s'y trouve n'a pas de taille tant qu'il est fermé. On l'ouvre,
+    // une fois par étape — l'utilisateur reste libre de le refermer.
+    if (el && menuOuvertPour.current !== etape) {
+      const menu = el.closest('details');
+      if (menu && !menu.open) {
+        menu.open = true;
+        el.scrollIntoView({ block: 'center' });
+      }
+      menuOuvertPour.current = etape;
+    }
     const suivant = el ? el.getBoundingClientRect() : null;
     setRect((r) => (memeRect(r, suivant) ? r : suivant));
     // Le chronomètre n'avance que pendant l'attente — cas exceptionnel : un

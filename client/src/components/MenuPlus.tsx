@@ -6,7 +6,21 @@ import { useEffect, useRef, type ReactNode } from 'react';
  * de celles qu'on fait cent fois par jour, sans les cacher. Chaque entrée dit
  * ce qu'elle entraîne — c'est la place qu'un simple bouton n'avait pas.
  */
-export function MenuPlus({ libelle = 'Plus', children }: { libelle?: string; children: ReactNode }) {
+export function MenuPlus({
+  libelle = 'Plus',
+  ariaLabel,
+  icone,
+  className,
+  children,
+}: {
+  libelle?: string;
+  /** Nom complet pour les lecteurs d'écran, quand le libellé seul est ambigu. */
+  ariaLabel?: string;
+  /** Pictogramme placé avant le libellé (le chevron reste après). */
+  icone?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
   const ref = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
@@ -30,8 +44,9 @@ export function MenuPlus({ libelle = 'Plus', children }: { libelle?: string; chi
   }, []);
 
   return (
-    <details className="menu-plus no-print" ref={ref}>
-      <summary className="btn btn-ghost btn-sm">
+    <details className={`menu-plus no-print${className ? ` ${className}` : ''}`} ref={ref}>
+      <summary className="btn btn-ghost btn-sm" aria-label={ariaLabel}>
+        {icone}
         {libelle} <ChevronDown className="ic" aria-hidden />
       </summary>
       {/* Un clic sur une entrée referme le menu : l'action est partie. */}
@@ -54,9 +69,12 @@ export function MenuPlusItem({
   titre,
   detail,
   danger,
+  tour,
   onClick,
 }: {
   icone?: ReactNode;
+  /** Cible de la visite guidée (attribut `data-tour`). */
+  tour?: string;
   titre: string;
   /** Ce que l'action entraîne, dit avant qu'on clique. */
   detail?: string;
@@ -67,6 +85,7 @@ export function MenuPlusItem({
     <button
       type="button"
       className={danger ? 'menu-plus-item menu-plus-item-danger' : 'menu-plus-item'}
+      data-tour={tour}
       onClick={onClick}
     >
       {icone}

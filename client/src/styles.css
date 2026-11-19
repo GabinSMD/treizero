@@ -6547,3 +6547,346 @@ h2 {
     justify-content: start;
   }
 }
+
+/* ===================================================================== */
+/* Table de marque sur téléphone et tablette (#193)                       */
+/* ===================================================================== */
+
+/* --- Bulle de l'assistant : elle s'efface quand on fait défiler vers le bas,
+       et revient dès qu'on remonte, en haut ou en bas de page. Fixée dans un
+       coin, elle couvrait sinon ce qu'on était en train de lire. --- */
+.help-fab {
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.15s;
+}
+
+.help-fab-cache {
+  transform: translateY(calc(100% + 1.6rem));
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Au clavier, la bulle reste joignable : le focus la fait revenir. Pendant
+   un parcours guidé aussi, qui peut la désigner. */
+.help-fab-cache:focus-visible,
+:root:has(.tour-layer) .help-fab-cache {
+  pointer-events: auto;
+  transform: none;
+  opacity: 1;
+}
+
+/* --- Saisie rapide : le champ, en grand, devant tout le reste. --- */
+.quick-score-bar {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.quick-score-label-champ {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0;
+  font-weight: 700;
+  color: var(--accent-dark);
+}
+
+.quick-score-ligne {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.quick-score-bar .quick-score-ligne input {
+  width: 9rem;
+  min-height: 3rem;
+  font-size: 1.45rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.quick-score-ligne .quick-score-mode {
+  align-self: center;
+}
+
+/* Le choix actif prend le bleu plein des boutons principaux : la teinte
+   d'accent, claire en thème sombre, ne portait pas un texte blanc. */
+.quick-score-mode .actif {
+  background: var(--accent-plein);
+  border-color: var(--accent-plein);
+  color: #fff;
+}
+
+@media (min-width: 641px) {
+  .quick-score {
+    padding: 0.8rem 1rem;
+  }
+
+  .quick-score-bar .quick-score-ligne input {
+    width: 12rem;
+    min-height: 3.5rem;
+    font-size: 1.8rem;
+  }
+
+  .quick-score-ligne .quick-score-mode .btn {
+    min-height: 2.75rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* --- Liste des équipes : « Forfait » en toutes lettres. --- */
+.btn-forfait {
+  white-space: nowrap;
+}
+
+.teams-table .cell-actions {
+  width: auto;
+}
+
+@media (max-width: 640px) {
+  /* --- En-tête du concours, compact : le titre, une ligne d'infos, puis le
+         statut et un seul menu d'actions sur la même ligne. --- */
+  .concours-head {
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .concours-head h1 {
+    font-size: 1.45rem;
+  }
+
+  .concours-meta {
+    font-size: 0.85rem;
+  }
+
+  .concours-actions {
+    position: relative;
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+  }
+
+  .next-step {
+    padding: 0.5rem 0.7rem;
+    margin-bottom: 0.7rem;
+    flex-wrap: nowrap;
+  }
+
+  .masque-telephone {
+    display: none;
+  }
+
+  .next-step-go {
+    flex: none;
+  }
+
+  .quick-score {
+    margin-bottom: 0.7rem;
+  }
+
+  .quick-score-bar .quick-score-ligne input {
+    flex: 1 1 6rem;
+    width: auto;
+    min-width: 0;
+  }
+
+  /* --- Onglets du concours : une barre fixée en bas de l'écran. Tous les
+         onglets y sont visibles, et à portée du pouce. --- */
+  nav.tabs.tabs-bas {
+    position: fixed;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    gap: 0.15rem;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    overflow: visible;
+    border-radius: 0;
+    padding: 0.3rem calc(0.3rem + env(safe-area-inset-right))
+      calc(0.3rem + env(safe-area-inset-bottom)) calc(0.3rem + env(safe-area-inset-left));
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -2px 12px rgba(20, 30, 58, 0.1);
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .tabs-bas .tab {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 3.2rem;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0.35rem 0.1rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    line-height: 1.1;
+  }
+
+  .tabs-bas .tab-icon {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+  .tabs-bas .tab.active {
+    background: var(--accent-soft);
+    color: var(--accent-dark);
+    box-shadow: none;
+  }
+
+  .tab-court {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .tab-compte {
+    font-size: 0.62rem;
+    font-weight: 700;
+    background: var(--neutre);
+    border-radius: 999px;
+    padding: 0 0.3rem;
+  }
+
+  .tabs-bas .tab.active .tab-compte {
+    background: var(--card);
+  }
+
+  /* La barre couvre le bas de l'écran : la page, la bulle et le panneau de
+     l'assistant se placent au-dessus. */
+  :root:has(nav.tabs-bas) {
+    --barre-bas: calc(3.85rem + env(safe-area-inset-bottom));
+  }
+
+  .app:has(nav.tabs-bas) {
+    padding-bottom: var(--barre-bas);
+  }
+
+  .help-fab {
+    bottom: calc(0.8rem + var(--barre-bas, env(safe-area-inset-bottom)));
+  }
+
+  .chat-panel {
+    bottom: calc(4.6rem + var(--barre-bas, 0px));
+    height: min(70vh, 560px, calc(100dvh - 9rem - var(--barre-bas, 0px)));
+  }
+
+  .install-banner {
+    bottom: var(--barre-bas, 0px);
+  }
+}
+
+/* --- Liste des équipes sur téléphone : une carte par équipe. --- */
+@media screen and (max-width: 640px) {
+  .teams-cartes,
+  .teams-cartes tbody {
+    display: block;
+    border: none;
+    background: none;
+    box-shadow: none;
+  }
+
+  .teams-cartes thead {
+    display: none;
+  }
+
+  .teams-cartes tr {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    column-gap: 0.6rem;
+    row-gap: 0.3rem;
+    align-items: start;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0.65rem 0.7rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .teams-cartes tr.row-editing {
+    background: var(--accent-soft);
+  }
+
+  .teams-cartes td,
+  .teams-cartes th {
+    display: block;
+    padding: 0 !important;
+    border: none;
+    grid-column: 3 / -1;
+  }
+
+  .teams-cartes td:empty {
+    display: none;
+  }
+
+  .teams-cartes .cell-retenue {
+    grid-column: 1;
+    grid-row: 1;
+    padding-top: 0.2rem !important;
+  }
+
+  .teams-cartes .cell-number {
+    grid-column: 2;
+    grid-row: 1;
+    width: auto;
+    min-width: 1.8rem;
+    font-size: 1.2rem;
+    line-height: 1.3;
+  }
+
+  .teams-cartes .cell-joueurs {
+    grid-column: 3;
+    grid-row: 1;
+    font-weight: 600;
+  }
+
+  .teams-cartes .player-chip {
+    display: block;
+  }
+
+  .teams-cartes .cell-actions {
+    grid-column: 4;
+    grid-row: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  .teams-cartes .cell-club {
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  .teams-cartes .cell-club:empty {
+    display: none;
+  }
+
+  .teams-cartes td[data-label]::before {
+    content: attr(data-label) ' : ';
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+
+  .teams-cartes .empty-cell {
+    grid-column: 1 / -1;
+  }
+
+  /* Les champs d'une équipe en cours de modification prennent toute la
+     largeur de la carte. */
+  .teams-cartes .row-editing td:not(.cell-number):not(.cell-actions) {
+    grid-column: 1 / -1;
+  }
+
+  .teams-cartes .row-editing .player-inputs input,
+  .teams-cartes .row-editing td > input {
+    width: 100%;
+  }
+}

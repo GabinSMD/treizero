@@ -6,6 +6,7 @@ import {
   aDesCriteresLicence,
   controlerEquipe,
   criteresDuConcours,
+  fileInscriptions,
   parseLicenceQr,
   placerScan,
 } from '@shared';
@@ -67,6 +68,8 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
   useEffect(() => {
     for (const l of enInscription.current) if (dejaInscrites.has(l)) enInscription.current.delete(l);
   }, [dejaInscrites]);
+  /** Les équipes parties à l'enregistrement s'écrivent l'une après l'autre. */
+  const enFile = useRef(fileInscriptions()).current;
 
   /**
    * Contrôle des critères du concours sur l'équipe en cours de scan, comme le
@@ -102,7 +105,7 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
     if (!decode.licence) {
       setAlerte(
         `Contenu non reconnu comme une licence : « ${decode.brut.slice(0, 60)} ». ` +
-          'Saisissez le joueur à la main, ou envoyez-moi ce contenu pour que je le décode.',
+          'Saisissez le numéro de licence à la main.',
       );
       return;
     }
@@ -156,7 +159,8 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
     // L'équipe quitte l'écran dès son départ, pas au retour de la base : un
     // scan arrivé pendant l'écriture ouvre l'équipe suivante au lieu d'être
     // coupé d'une équipe déjà pleine (voir `scanInscription.ts`). Ses licences
-    // restent tenues jusqu'à ce que `teams` les compte parmi les inscrites.
+    // restent tenues jusqu'à ce que `teams` les compte parmi les inscrites, et
+    // son écriture attend dans `enFile` que la précédente ait pris son dossard.
     const licences = joueurs.flatMap((j) => (j.licence ? [j.licence] : []));
     for (const l of licences) enInscription.current.add(l);
     setEncours([]);
@@ -170,15 +174,17 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
       // connue, comme le remplacement au dépôt (`depot.ts`). Le club de la
       // première fiche reste le club d'équipe, valeur par défaut des concours
       // de club.
-      await addTeam(
-        concours.id,
-        joueurs.map((j) => ({
-          name: j.name.trim(),
-          licence: j.licence,
-          ...(j.fiche?.club ? { club: j.fiche.club } : {}),
-          ...(j.fiche?.comite ? { comite: j.fiche.comite } : {}),
-        })),
-        club,
+      await enFile(() =>
+        addTeam(
+          concours.id,
+          joueurs.map((j) => ({
+            name: j.name.trim(),
+            licence: j.licence,
+            ...(j.fiche?.club ? { club: j.fiche.club } : {}),
+            ...(j.fiche?.comite ? { comite: j.fiche.comite } : {}),
+          })),
+          club,
+        ),
       );
     } catch (e) {
       for (const l of licences) enInscription.current.delete(l);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { placerScan } from '../scanInscription';
+import { fileInscriptions, placerScan } from '../scanInscription';
 
 const vide = { dejaInscrites: new Map<string, number>(), enInscription: new Set<string>() };
 
@@ -73,5 +73,40 @@ describe('placement d un scan dans l équipe en cours d inscription', () => {
     }
     expect(equipes).toHaveLength(5);
     expect(new Set(equipes.flat()).size).toBe(10);
+  });
+});
+
+describe('file des inscriptions', () => {
+  /** Inscription simulée : lit les dossards pris, attend la base, puis écrit. */
+  const inscrire = (dossards: number[]) => async (): Promise<number> => {
+    const lu = dossards.length;
+    await new Promise((r) => setTimeout(r, 1));
+    const numero = lu + 1;
+    dossards.push(numero);
+    return numero;
+  };
+
+  it('deux équipes complétées coup sur coup reçoivent deux dossards différents', async () => {
+    // Sans file, les deux écritures lisent la même liste et prennent le n°1.
+    const dossards: number[] = [];
+    const enFile = fileInscriptions();
+    const numeros = await Promise.all([
+      enFile(inscrire(dossards)),
+      enFile(inscrire(dossards)),
+      enFile(inscrire(dossards)),
+    ]);
+    expect(numeros).toEqual([1, 2, 3]);
+    expect(dossards).toEqual([1, 2, 3]);
+  });
+
+  it('un échec revient à son appelant sans bloquer les inscriptions suivantes', async () => {
+    const dossards: number[] = [];
+    const enFile = fileInscriptions();
+    const echec = enFile(async () => {
+      throw new Error('base indisponible');
+    });
+    const suivante = enFile(inscrire(dossards));
+    await expect(echec).rejects.toThrow('base indisponible');
+    await expect(suivante).resolves.toBe(1);
   });
 });

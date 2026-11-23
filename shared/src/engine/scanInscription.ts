@@ -69,3 +69,22 @@ export function placerScan(
   }
   return { ok: true, complete: encours.length + 1 === parEquipe };
 }
+
+/**
+ * File qui inscrit les équipes l'une après l'autre.
+ *
+ * L'équipe complète quitte l'écran dès son départ : deux équipes complétées
+ * coup sur coup à la douchette partent donc à l'enregistrement avant que la
+ * première soit écrite. Lancées ensemble, les deux écritures lisaient la même
+ * liste d'équipes et prenaient le même dossard. La file fait attendre chaque
+ * inscription derrière la précédente ; un échec ne bloque pas les suivantes,
+ * il revient seulement à celui qui l'a lancée.
+ */
+export function fileInscriptions(): <T>(tache: () => Promise<T>) => Promise<T> {
+  let fin: Promise<unknown> = Promise.resolve();
+  return (tache) => {
+    const resultat = fin.then(tache);
+    fin = resultat.catch(() => undefined);
+    return resultat;
+  };
+}

@@ -22,10 +22,18 @@
  */
 
 export interface ContexteScan {
-  /** Licence → numéro de l'équipe où elle est déjà inscrite. */
-  dejaInscrites: ReadonlyMap<string, number>;
+  /**
+   * Licence → équipe où elle est déjà inscrite : son numéro (dossard d'un
+   * concours) ou son nom (« Equipe A » d'une feuille de match).
+   */
+  dejaInscrites: ReadonlyMap<string, number | string>;
   /** Licences d'une équipe partie à l'enregistrement, pas encore relue de la base. */
   enInscription: ReadonlySet<string>;
+  /**
+   * Ce qu'il faut faire quand l'équipe est complète, dit à la suite du refus.
+   * Par défaut, la consigne de l'inscription : inscrire l'équipe d'abord.
+   */
+  siComplete?: (licence: string) => string;
 }
 
 export type PlacementScan =
@@ -44,14 +52,15 @@ export function placerScan(
   encours: readonly string[],
   licence: string,
   parEquipe: number,
-  { dejaInscrites, enInscription }: ContexteScan,
+  { dejaInscrites, enInscription, siComplete }: ContexteScan,
 ): PlacementScan {
   if (encours.includes(licence)) {
     return { ok: false, raison: `Licence ${licence} déjà scannée pour cette équipe.` };
   }
   const equipe = dejaInscrites.get(licence);
   if (equipe !== undefined) {
-    return { ok: false, raison: `Licence ${licence} déjà inscrite dans l'équipe n°${equipe}.` };
+    const nom = typeof equipe === 'number' ? `l'équipe n°${equipe}` : equipe;
+    return { ok: false, raison: `Licence ${licence} déjà inscrite dans ${nom}.` };
   }
   if (enInscription.has(licence)) {
     return {
@@ -64,7 +73,7 @@ export function placerScan(
       ok: false,
       raison:
         `Équipe complète (${parEquipe} joueur${parEquipe > 1 ? 's' : ''}) : ` +
-        `inscrivez-la avant de scanner la licence ${licence}.`,
+        (siComplete?.(licence) ?? `inscrivez-la avant de scanner la licence ${licence}.`),
     };
   }
   return { ok: true, complete: encours.length + 1 === parEquipe };

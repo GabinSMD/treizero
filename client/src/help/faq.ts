@@ -646,7 +646,8 @@ export const FAQ: FaqEntry[] = [
     steps: [
       'Depuis le tableau de bord, ouvrez « Feuilles de match ».',
       '« + Nouvelle feuille » : renseignez les deux clubs et la date.',
-      'Composez les équipes, puis saisissez les résultats des rencontres.',
+      'Composez les équipes en scannant les licences (8 joueurs par fiche). Avec « À la volée » coché, la fiche complète passe la main à l\'équipe suivante du club, A → H, créée si besoin.',
+      'Saisissez ensuite les résultats des rencontres.',
       'Les deux clubs peuvent échanger leurs compositions par QR code, sans réseau.',
       'Faites signer les deux capitaines, puis imprimez ou exportez la feuille en fichier.',
     ],

@@ -1,14 +1,16 @@
 import { Check, TriangleAlert, Undo2 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Concours, Licencie, Team } from '@shared';
 import {
   TAILLE_FORMATION,
   controlerEquipe,
   criteresDuConcours,
+  SCAN_DEPOT_VIDE,
   depotStats,
-  lireLicenceAuDepot,
   parseLicenceQr,
   placesLibres,
+  scannerAuDepot,
+  type EtatScanDepot,
   type ChampLicence,
   type ControleEquipe,
   type CriteresLicence,
@@ -99,7 +101,32 @@ export function LicencesTab({ concours, teams }: Props) {
   );
 
   const [filtre, setFiltre] = useState<Filtre>('toutes');
-  const [ouverte, setOuverte] = useState<string | null>(null);
+  const [aLaVolee, setALaVolee] = useState(true);
+  /**
+   * Équipe ouverte et licences déjà scannées (manuel §3.B.2-3.B.3 au dépôt).
+   * Tenu dans une ref, lue et écrite au moment du scan : deux lectures de la
+   * caméra arrivées avant le rendu suivant ne doivent pas partir du même état
+   * et s'effacer l'une l'autre. L'état React n'est que son reflet à l'écran.
+   */
+  const scan = useRef<EtatScanDepot>(SCAN_DEPOT_VIDE);
+  const [scanAffiche, setScanAffiche] = useState<EtatScanDepot>(SCAN_DEPOT_VIDE);
+  const poser = (etat: EtatScanDepot): void => {
+    scan.current = etat;
+    setScanAffiche(etat);
+  };
+  const ouverte = scanAffiche.ouverte;
+  /** Ouvrir ou fermer une équipe à la main repart d'un décompte vide. */
+  const setOuverte = (id: string | null): void => poser({ ouverte: id, scannees: [] });
+  /**
+   * Équipes dont le dépôt est parti à la base sans être encore relu dans
+   * `teams` : une relecture d'une de leurs licences est refusée, pas revalidée.
+   */
+  const enDepot = useRef(new Set<string>());
+  useEffect(() => {
+    for (const id of enDepot.current) {
+      if (teams.find((t) => t.id === id)?.licencesDeposees) enDepot.current.delete(id);
+    }
+  }, [teams]);
   const [saisie, setSaisie] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   /**
@@ -124,6 +151,11 @@ export function LicencesTab({ concours, teams }: Props) {
    * Scanner une licence. Trois issues, comme sur l'écran fédéral (p.38-39) :
    * c'est un joueur de l'équipe ouverte, c'est un joueur d'une autre équipe, ou
    * **« Pas inscrit ! »** — et ce dernier cas seul ouvre le remplacement.
+   *
+   * « À la volée », les joueurs scannés de l'équipe sont retenus, et le dépôt
+   * se valide tout seul quand toute la formation est passée : l'équipe se
+   * referme et le scan suivant ouvre la suivante. La décision est dans
+   * `scannerAuDepot` ; un refus y porte toujours sa raison.
    */
   const scanner = (contenu: string): void => {
     const decode = parseLicenceQr(contenu);
@@ -132,38 +164,37 @@ export function LicencesTab({ concours, teams }: Props) {
       setMessage(`Contenu non reconnu : « ${contenu.slice(0, 40)} ».`);
       return;
     }
-    const lu = lireLicenceAuDepot(licence, teams, ouverte, fiches);
-    if (lu.type === 'equipe_ouverte') {
+    const r = scannerAuDepot(scan.current, licence, teams, {
+      fiches,
+      taillePrevue,
+      aLaVolee,
+      enDepot: enDepot.current,
+      enSuspens: Boolean(enAttente),
+    });
+    if (r.etat.ouverte !== scan.current.ouverte) {
       setEnAttente(null);
-      setMessage(`Licence ${licence} : joueur ${lu.index + 1} de cette équipe.`);
+      setFiltre('toutes');
+    }
+    poser(r.etat);
+    setMessage(r.message);
+    if (r.issue.type === 'pas_inscrit') {
+      setEnAttente({ licence: r.issue.licence, fiche: r.issue.fiche });
       return;
     }
-    if (lu.type === 'autre_equipe') {
-      // Sans équipe ouverte, le scan sert à trouver l'équipe : c'est le geste
-      // utile du scan à froid, et il ne doit pas se perdre.
-      if (!ouverte) {
-        setEnAttente(null);
-        setOuverte(lu.team.id);
-        setFiltre('toutes');
-        setMessage(`Équipe n°${lu.team.number} — licence ${licence}.`);
-        return;
-      }
+    if (r.issue.type === 'compte') setEnAttente(null);
+    if (r.issue.type === 'valider') {
+      const team = r.issue.team;
+      enDepot.current.add(team.id);
       setEnAttente(null);
-      setMessage(
-        `Licence ${licence} : inscrite dans l'équipe n°${lu.team.number}, pas dans celle-ci. ` +
-          `Un joueur inscrit deux fois est une erreur d'inscription, pas un remplacement.`,
-      );
-      return;
+      setLicencesDeposees(team, true).catch((e: unknown) => {
+        enDepot.current.delete(team.id);
+        // Rien de muet : l'échec de l'écriture se dit, et le bouton reste.
+        setMessage(
+          `Le dépôt de l'équipe n°${team.number} n'a pas pu être enregistré ` +
+            `(${e instanceof Error ? e.message : String(e)}) : validez-le à la main.`,
+        );
+      });
     }
-    if (!ouverte) {
-      setMessage(
-        `Licence ${licence} : aucune équipe inscrite ne la porte. Ouvrez l'équipe qui reçoit ` +
-          `le remplaçant pour l'y installer.`,
-      );
-      return;
-    }
-    setEnAttente({ licence, fiche: lu.fiche });
-    setMessage(null);
   };
 
   return (
@@ -208,6 +239,14 @@ export function LicencesTab({ concours, teams }: Props) {
           autoComplete="off"
         />
         <span className="toolbar-actions">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={aLaVolee}
+              onChange={(e) => setALaVolee(e.target.checked)}
+            />
+            À la volée : valider le dépôt dès que toute l'équipe est scannée
+          </label>
           {(['toutes', 'a_deposer', 'non_conformes'] as Filtre[]).map((f) => (
             <button
               key={f}
@@ -342,6 +381,8 @@ export function LicencesTab({ concours, teams }: Props) {
                       c.categorie === 'cadets' ||
                       c.categorie === 'minimes' ||
                       c.categorie === 'benjamins';
+                    const scanne =
+                      Boolean(joueur.licence) && scanAffiche.scannees.includes(joueur.licence!);
                     return (
                       <div key={i} className="depot-joueur">
                         <div className="depot-joueur-tete">
@@ -385,6 +426,11 @@ export function LicencesTab({ concours, teams }: Props) {
                             placeholder="N° licence"
                             aria-label={`Licence du joueur ${i + 1}`}
                           />
+                          {scanne && (
+                            <span className="tag tag-ok">
+                              <Check className="ic" aria-hidden /> scannée
+                            </span>
+                          )}
                         </div>
 
                         {c.inconnu ? (

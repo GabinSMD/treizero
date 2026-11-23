@@ -69,3 +69,4 @@ export * from './engine/terrains';
 export * from './engine/saisieNombres';
 export * from './engine/effacementsAval';
 export * from './engine/defautsConcours';
+export * from './engine/annonces';

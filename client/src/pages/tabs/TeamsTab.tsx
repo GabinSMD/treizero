@@ -2,6 +2,7 @@ import { MenuPlus, MenuPlusItem } from '../../components/MenuPlus';
 import { ArrowDownToLine, Ban, Camera, Check, ClipboardList, Coins, Download, Euro, Globe, Lightbulb, Mail, MapPin, Pencil, Search, Trash2, TriangleAlert, Undo2, User, X } from 'lucide-react';
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { useTelephone } from '../../lib/ecran';
 import { LicenceEtrangereModal } from '../../components/LicenceEtrangereModal';
 import { LicenceScanModal } from '../../components/LicenceScanModal';
 import { Modal } from '../../components/Modal';
@@ -54,6 +55,7 @@ export function TeamsTab({ concours, teams, poules }: Props) {
   const [bilanImport, setBilanImport] = useState<string | null>(null);
   const { individual, nbPlayers, avecRoles, rolesProposes } = parametresSaisie(concours);
   const locked = concours.status !== 'inscriptions';
+  const telephone = useTelephone();
   const [names, setNames] = useState<string[]>(Array(nbPlayers).fill(''));
   const [licences, setLicences] = useState<string[]>(Array(nbPlayers).fill(''));
   const [clubs, setClubs] = useState<string[]>(Array(nbPlayers).fill(''));
@@ -650,7 +652,7 @@ export function TeamsTab({ concours, teams, poules }: Props) {
       )}
 
       <div className="table-scroll">
-      <table className="teams-table">
+      <table className={telephone ? 'teams-table teams-cartes' : 'teams-table'}>
         <thead>
           <tr>
             {/* Manuel §3.D.1.B.5.1. */}
@@ -695,7 +697,7 @@ export function TeamsTab({ concours, teams, poules }: Props) {
                   />
                 </td>
                 <td className="cell-number">{team.number}</td>
-                <td>
+                <td className="cell-joueurs">
                   {team.players.map((p, i) => (
                     <span key={i} className="player-chip">
                       {p.name}
@@ -715,14 +717,16 @@ export function TeamsTab({ concours, teams, poules }: Props) {
                   ))}
                   {team.forfait && <span className="tag tag-danger">Forfait</span>}
                 </td>
-                <td>{libelleClubs(team.players, team.club) || (team.club ?? '')}</td>
+                <td className="cell-club">
+                  {libelleClubs(team.players, team.club) || (team.club ?? '')}
+                </td>
                 {controlActif && (
-                  <td className="cell-controle">
+                  <td className="cell-controle" data-label="Licences">
                     <ControleBadge controle={controles.get(team.id)} />
                   </td>
                 )}
                 {trackPaid && (
-                  <td className="cell-paid">
+                  <td className="cell-paid" data-label="Mise">
                     {/* Trois états, comme le cadre « Mises » du manuel : une case
                         à cocher ne pouvait pas dire « facturation ». */}
                     <select
@@ -752,51 +756,130 @@ export function TeamsTab({ concours, teams, poules }: Props) {
                   </td>
                 )}
                 <td className="no-print cell-actions">
-                  {(!locked || modification) && (
+                  {telephone && locked && !modification ? (
+                    // Après le tirage, le forfait est la seule action : un menu
+                    // d'une entrée coûterait un toucher pour rien.
                     <button
-                      className="btn-icon"
-                      aria-label={`Modifier l'équipe n°${team.number}`}
-                      title={
-                        locked
-                          ? 'Modifier la composition (le tirage n\'est pas touché)'
-                          : 'Modifier'
-                      }
-                      onClick={() => setEditingId(team.id)}
+                      className="btn btn-ghost btn-sm btn-forfait"
+                      aria-label={`${team.forfait ? 'Annuler le forfait de' : 'Déclarer forfait'} l'équipe n°${team.number}`}
+                      onClick={() => void updateTeam({ ...team, forfait: !team.forfait })}
                     >
-                      <Pencil className="ic" aria-hidden />
+                      {team.forfait ? (
+                        <>
+                          <Undo2 className="ic" aria-hidden /> Annuler le forfait
+                        </>
+                      ) : (
+                        'Forfait'
+                      )}
                     </button>
-                  )}
-                  {!locked && (
-                    <button
-                      className="btn-icon"
-                      aria-label={`Insérer une équipe avant le n°${team.number}`}
-                      title={`Insérer une équipe avant le n°${team.number} (les suivants décalent)`}
-                      onClick={() => setInsertionAvant(team.number)}
+                  ) : telephone ? (
+                    // Sur téléphone, une carte par équipe : les actions passent
+                    // dans un menu, chacune dite en toutes lettres.
+                    <MenuPlus
+                      libelle="Actions"
+                      ariaLabel={`Actions sur l'équipe n°${team.number}`}
+                      className="team-card-menu"
                     >
-                      <ArrowDownToLine className="ic" aria-hidden />
-                    </button>
-                  )}
-                  <button
-                    className="btn-icon"
-                    aria-label={`${team.forfait ? 'Annuler le forfait de' : 'Déclarer forfait'} l'équipe n°${team.number}`}
-                    title={team.forfait ? 'Annuler le forfait' : 'Déclarer forfait'}
-                    onClick={() => void updateTeam({ ...team, forfait: !team.forfait })}
-                  >
-                    {team.forfait ? <Undo2 className="ic" aria-hidden /> : 'FF'}
-                  </button>
-                  {!locked && (
-                    <button
-                      className="btn-icon btn-icon-danger"
-                      aria-label={`Supprimer l'équipe n°${team.number}`}
-                      title="Supprimer"
-                      onClick={() => {
-                        if (window.confirm(`Supprimer l'équipe n°${team.number} ?`)) {
-                          void deleteTeam(team);
+                      {(!locked || modification) && (
+                        <MenuPlusItem
+                          icone={<Pencil className="ic" aria-hidden />}
+                          titre="Modifier"
+                          detail={
+                            locked ? 'Changer un joueur sans toucher au tirage.' : undefined
+                          }
+                          onClick={() => setEditingId(team.id)}
+                        />
+                      )}
+                      {!locked && (
+                        <MenuPlusItem
+                          icone={<ArrowDownToLine className="ic" aria-hidden />}
+                          titre={`Insérer une équipe avant le n°${team.number}`}
+                          detail="Les numéros suivants sont décalés."
+                          onClick={() => setInsertionAvant(team.number)}
+                        />
+                      )}
+                      <MenuPlusItem
+                        icone={
+                          team.forfait ? (
+                            <Undo2 className="ic" aria-hidden />
+                          ) : (
+                            <Ban className="ic" aria-hidden />
+                          )
                         }
-                      }}
-                    >
-                      <Trash2 className="ic" aria-hidden />
-                    </button>
+                        titre={team.forfait ? 'Annuler le forfait' : 'Déclarer forfait'}
+                        detail={
+                          team.forfait ? undefined : "L'équipe ne se présente pas ou abandonne."
+                        }
+                        onClick={() => void updateTeam({ ...team, forfait: !team.forfait })}
+                      />
+                      {!locked && (
+                        <MenuPlusItem
+                          danger
+                          icone={<Trash2 className="ic" aria-hidden />}
+                          titre="Supprimer l'équipe"
+                          onClick={() => {
+                            if (window.confirm(`Supprimer l'équipe n°${team.number} ?`)) {
+                              void deleteTeam(team);
+                            }
+                          }}
+                        />
+                      )}
+                    </MenuPlus>
+                  ) : (
+                    <>
+                      {(!locked || modification) && (
+                        <button
+                          className="btn-icon"
+                          aria-label={`Modifier l'équipe n°${team.number}`}
+                          title={
+                            locked
+                              ? 'Modifier la composition (le tirage n\'est pas touché)'
+                              : 'Modifier'
+                          }
+                          onClick={() => setEditingId(team.id)}
+                        >
+                          <Pencil className="ic" aria-hidden />
+                        </button>
+                      )}
+                      {!locked && (
+                        <button
+                          className="btn-icon"
+                          aria-label={`Insérer une équipe avant le n°${team.number}`}
+                          title={`Insérer une équipe avant le n°${team.number} (les suivants décalent)`}
+                          onClick={() => setInsertionAvant(team.number)}
+                        >
+                          <ArrowDownToLine className="ic" aria-hidden />
+                        </button>
+                      )}
+                      <button
+                        className="btn btn-ghost btn-sm btn-forfait"
+                        aria-label={`${team.forfait ? 'Annuler le forfait de' : 'Déclarer forfait'} l'équipe n°${team.number}`}
+                        title={team.forfait ? 'Annuler le forfait' : 'Déclarer forfait'}
+                        onClick={() => void updateTeam({ ...team, forfait: !team.forfait })}
+                      >
+                        {team.forfait ? (
+                          <>
+                            <Undo2 className="ic" aria-hidden /> Forfait
+                          </>
+                        ) : (
+                          'Forfait'
+                        )}
+                      </button>
+                      {!locked && (
+                        <button
+                          className="btn-icon btn-icon-danger"
+                          aria-label={`Supprimer l'équipe n°${team.number}`}
+                          title="Supprimer"
+                          onClick={() => {
+                            if (window.confirm(`Supprimer l'équipe n°${team.number} ?`)) {
+                              void deleteTeam(team);
+                            }
+                          }}
+                        >
+                          <Trash2 className="ic" aria-hidden />
+                        </button>
+                      )}
+                    </>
                   )}
                 </td>
               </tr>

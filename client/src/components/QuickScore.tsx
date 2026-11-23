@@ -1,5 +1,5 @@
 import { CircleCheck, Zap } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { Concours, Match, Poule, Team } from '@shared';
 import {
   campNumeros,
@@ -81,6 +81,7 @@ export function QuickScore({
     jeton: number;
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const champId = useId();
   const blocRef = useRef<HTMLDivElement>(null);
   const byNumber = useMemo(() => new Map(teams.map((t) => [t.number, t])), [teams]);
   const teamsById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
@@ -179,28 +180,15 @@ export function QuickScore({
           inputRef.current?.select();
         }}
       >
-        <span className="quick-score-mode" role="group" aria-label="Chercher par">
-          <button
-            type="button"
-            className={mode === 'equipe' ? 'btn btn-sm actif' : 'btn btn-sm btn-ghost'}
-            aria-pressed={mode === 'equipe'}
-            onClick={() => changerMode('equipe')}
-          >
-            Équipe
-          </button>
-          <button
-            type="button"
-            className={mode === 'terrain' ? 'btn btn-sm actif' : 'btn btn-sm btn-ghost'}
-            aria-pressed={mode === 'terrain'}
-            onClick={() => changerMode('terrain')}
-          >
-            Terrain
-          </button>
-        </span>
-        <label>
+        {/* Le geste le plus fréquent de la journée : le champ passe devant, en
+            grand, et le choix Équipe | Terrain se range à côté. */}
+        <label className="quick-score-label-champ" htmlFor={champId}>
           <Zap className="ic" aria-hidden />{' '}
           {mode === 'equipe' ? "Saisie rapide — n° d'équipe" : 'Saisie rapide — n° de terrain'}
+        </label>
+        <div className="quick-score-ligne">
           <input
+            id={champId}
             ref={inputRef}
             type={mode === 'terrain' && terrainEnLettres ? 'text' : 'number'}
             inputMode={mode === 'terrain' && terrainEnLettres ? 'text' : 'numeric'}
@@ -213,19 +201,37 @@ export function QuickScore({
             placeholder={mode === 'equipe' ? 'ex. 47' : terrainEnLettres ? 'ex. D' : 'ex. 5'}
             autoComplete="off"
           />
-        </label>
-        {num && (
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={() => {
-              setNum('');
-              setDemande(null);
-            }}
-          >
-            Effacer
-          </button>
-        )}
+          <span className="quick-score-mode" role="group" aria-label="Chercher par">
+            <button
+              type="button"
+              className={mode === 'equipe' ? 'btn btn-sm actif' : 'btn btn-sm btn-ghost'}
+              aria-pressed={mode === 'equipe'}
+              onClick={() => changerMode('equipe')}
+            >
+              Équipe
+            </button>
+            <button
+              type="button"
+              className={mode === 'terrain' ? 'btn btn-sm actif' : 'btn btn-sm btn-ghost'}
+              aria-pressed={mode === 'terrain'}
+              onClick={() => changerMode('terrain')}
+            >
+              Terrain
+            </button>
+          </span>
+          {num && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setNum('');
+                setDemande(null);
+              }}
+            >
+              Effacer
+            </button>
+          )}
+        </div>
       </form>
 
       {/* Le champ se vide après validation et le score s'affiche ailleurs dans la

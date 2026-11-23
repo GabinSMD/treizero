@@ -369,22 +369,27 @@ export async function addTeam(
   players: Player[],
   club?: string,
 ): Promise<void> {
-  const teams = await listByConcours('team', concoursId);
-  const concours = await getEntity('concours', concoursId);
-  const number = numeroPremiereEquipe(
-    teams.map((t) => t.number),
-    concours?.decalageEquipe,
-  );
-  const team: Team = {
-    id: crypto.randomUUID(),
-    concoursId,
-    number,
-    players,
-    club: club?.trim() || undefined,
-    forfait: false,
-    updatedAt: monotonicNow(),
-  };
-  await putEntity('team', team);
+  // Lecture des dossards pris et écriture dans une même transaction : deux
+  // inscriptions simultanées (lecteur de licences, deux onglets) prendraient
+  // sinon le même dossard.
+  await db.transaction('rw', db.entities, async () => {
+    const teams = await listByConcours('team', concoursId);
+    const concours = await getEntity('concours', concoursId);
+    const number = numeroPremiereEquipe(
+      teams.map((t) => t.number),
+      concours?.decalageEquipe,
+    );
+    const team: Team = {
+      id: crypto.randomUUID(),
+      concoursId,
+      number,
+      players,
+      club: club?.trim() || undefined,
+      forfait: false,
+      updatedAt: monotonicNow(),
+    };
+    await putEntity('team', team);
+  });
 }
 
 /**

@@ -78,7 +78,12 @@ export function Modal({ title, onClose, children }: Props) {
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div
+      className="modal-backdrop"
+      // Le second clic d'un double clic ne ferme pas : il visait un bouton de
+      // la modale, que le premier clic a pu déplacer en changeant son contenu.
+      onClick={(e) => e.detail > 1 || onClose()}
+    >
       <div
         className="modal"
         ref={boite}

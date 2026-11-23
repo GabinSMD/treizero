@@ -6,7 +6,9 @@ import {
   aDesCriteresLicence,
   controlerEquipe,
   criteresDuConcours,
+  fileInscriptions,
   parseLicenceQr,
+  placerScan,
 } from '@shared';
 import { addTeam } from '../db/actions';
 import { useLicencies } from '../db/hooks';
@@ -59,8 +61,21 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [alerte, setAlerte] = useState<string | null>(null);
   const [inscrites, setInscrites] = useState(0);
+  /** Change à chaque alerte posée ou levée, pour savoir si celle de l'écran a changé. */
+  const versionAlerte = useRef(0);
+  const alerter = (texte: string | null): void => {
+    versionAlerte.current += 1;
+    setAlerte(texte);
+  };
 
   const champ = useRef<HTMLInputElement>(null);
+  /** Licences de l'équipe partie à l'enregistrement, pas encore dans `teams`. */
+  const enInscription = useRef(new Set<string>());
+  useEffect(() => {
+    for (const l of enInscription.current) if (dejaInscrites.has(l)) enInscription.current.delete(l);
+  }, [dejaInscrites]);
+  /** Les équipes parties à l'enregistrement s'écrivent l'une après l'autre. */
+  const enFile = useRef(fileInscriptions()).current;
 
   /**
    * Contrôle des critères du concours sur l'équipe en cours de scan, comme le
@@ -94,45 +109,46 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
     if (!decode) return;
 
     if (!decode.licence) {
-      setAlerte(
+      alerter(
         `Contenu non reconnu comme une licence : « ${decode.brut.slice(0, 60)} ». ` +
-          'Saisissez le joueur à la main, ou envoyez-moi ce contenu pour que je le décode.',
+          'Saisissez le numéro de licence à la main.',
       );
       return;
     }
 
-    if (encours.some((j) => j.licence === decode.licence)) {
-      setAlerte(`Licence ${decode.licence} déjà scannée pour cette équipe.`);
-      return;
-    }
-    const equipe = dejaInscrites.get(decode.licence);
-    if (equipe !== undefined) {
-      setAlerte(`Licence ${decode.licence} déjà inscrite dans l'équipe n°${equipe}.`);
+    const placement = placerScan(
+      encours.map((j) => j.licence ?? ''),
+      decode.licence,
+      parEquipe,
+      { dejaInscrites, enInscription: enInscription.current },
+    );
+    if (!placement.ok) {
+      alerter(placement.raison);
       return;
     }
 
     const fiche = parLicence.get(decode.licence);
     const nom = fiche?.name ?? decode.name ?? '';
     if (!fiche && !nom) {
-      setAlerte(
+      alerter(
         `Licence ${decode.licence} inconnue du fichier des licenciés : ` +
           'complétez le nom à la main.',
       );
     } else {
-      setAlerte(null);
+      alerter(null);
     }
 
     const joueur: Scanne = { name: nom, licence: decode.licence, brut: decode.brut, fiche };
-    const suivant = [...encours, joueur].slice(0, parEquipe);
+    const suivant = [...encours, joueur];
     setEncours(suivant);
     setMessage(null);
 
     // À la volée, on n'inscrit que si chaque joueur porte un nom : une licence
     // inconnue du fichier doit être complétée à la main, pas abandonnée.
-    if (suivant.length === parEquipe && aLaVolee) {
+    if (placement.complete && aLaVolee) {
       if (suivant.every((j) => j.name.trim())) void inscrire(suivant);
       else
-        setAlerte(
+        alerter(
           'Équipe complète, mais un nom manque : complétez-le puis validez avec « Inscrire l\'équipe ».',
         );
     }
@@ -142,28 +158,57 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
     if (joueurs.length === 0) return;
     // Aucun joueur n'est abandonné en route : on refuse plutôt d'inscrire.
     if (joueurs.some((j) => !j.name.trim())) {
-      setAlerte('Complétez le nom de chaque joueur avant d\'inscrire l\'équipe.');
+      alerter('Complétez le nom de chaque joueur avant d\'inscrire l\'équipe.');
       return;
     }
     const club = joueurs.find((j) => j.fiche?.club)?.fiche?.club;
-    // §3.B.2 : le club et le comité appartiennent au joueur, pas à l'équipe —
-    // une équipe de national ou de régional réunit des licenciés de clubs et de
-    // comités différents. On les reprend de la fiche quand elle est connue,
-    // comme le remplacement au dépôt (`depot.ts`). Le club de la première fiche
-    // reste le club d'équipe, valeur par défaut des concours de club.
-    await addTeam(
-      concours.id,
-      joueurs.map((j) => ({
-        name: j.name.trim(),
-        licence: j.licence,
-        ...(j.fiche?.club ? { club: j.fiche.club } : {}),
-        ...(j.fiche?.comite ? { comite: j.fiche.comite } : {}),
-      })),
-      club,
-    );
+    // L'équipe quitte l'écran dès son départ, pas au retour de la base : un
+    // scan arrivé pendant l'écriture ouvre l'équipe suivante au lieu d'être
+    // coupé d'une équipe déjà pleine (voir `scanInscription.ts`). Ses licences
+    // restent tenues jusqu'à ce que `teams` les compte parmi les inscrites, et
+    // son écriture attend dans `enFile` que la précédente ait pris son dossard.
+    const licences = joueurs.flatMap((j) => (j.licence ? [j.licence] : []));
+    for (const l of licences) enInscription.current.add(l);
     setEncours([]);
+    // L'alerte reste affichée pendant l'écriture : la lever au départ
+    // raccourcirait la modale sous le pointeur, et le second clic d'un double
+    // clic sur « Inscrire l'équipe » tomberait sur le fond grisé. Au retour, on
+    // ne lève que l'alerte du départ : un refus survenu pendant l'écriture doit
+    // rester affiché, sinon il redeviendrait muet.
+    const alerteAuDepart = versionAlerte.current;
+    try {
+      // §3.B.2 : le club et le comité appartiennent au joueur, pas à l'équipe —
+      // une équipe de national ou de régional réunit des licenciés de clubs et
+      // de comités différents. On les reprend de la fiche quand elle est
+      // connue, comme le remplacement au dépôt (`depot.ts`). Le club de la
+      // première fiche reste le club d'équipe, valeur par défaut des concours
+      // de club.
+      await enFile(() =>
+        addTeam(
+          concours.id,
+          joueurs.map((j) => ({
+            name: j.name.trim(),
+            licence: j.licence,
+            ...(j.fiche?.club ? { club: j.fiche.club } : {}),
+            ...(j.fiche?.comite ? { comite: j.fiche.comite } : {}),
+          })),
+          club,
+        ),
+      );
+    } catch (e) {
+      for (const l of licences) enInscription.current.delete(l);
+      // Rien n'est perdu en silence : l'équipe revient à l'écran si la place
+      // est libre, sinon ses joueurs sont nommés pour être rescannés.
+      setEncours((courant) => (courant.length === 0 ? joueurs : courant));
+      alerter(
+        `L'équipe n'a pas pu être inscrite (${e instanceof Error ? e.message : String(e)}) : ` +
+          joueurs.map((j) => j.name.trim()).join(', ') +
+          '.',
+      );
+      return;
+    }
+    if (versionAlerte.current === alerteAuDepart) alerter(null);
     setInscrites((n) => n + 1);
-    setAlerte(null);
     setMessage(`Équipe inscrite (${joueurs.length} joueur${joueurs.length > 1 ? 's' : ''}).`);
     champ.current?.focus();
   };
@@ -268,7 +313,13 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
               : ''}
           </span>
           {encours.length > 0 && (
-            <button className="btn btn-ghost" onClick={() => setEncours([])}>
+            <button
+              className="btn btn-ghost"
+              onClick={() => {
+                setEncours([]);
+                alerter(null);
+              }}
+            >
               Vider
             </button>
           )}

@@ -61,6 +61,12 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [alerte, setAlerte] = useState<string | null>(null);
   const [inscrites, setInscrites] = useState(0);
+  /** Change à chaque alerte posée ou levée, pour savoir si celle de l'écran a changé. */
+  const versionAlerte = useRef(0);
+  const alerter = (texte: string | null): void => {
+    versionAlerte.current += 1;
+    setAlerte(texte);
+  };
 
   const champ = useRef<HTMLInputElement>(null);
   /** Licences de l'équipe partie à l'enregistrement, pas encore dans `teams`. */
@@ -103,7 +109,7 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
     if (!decode) return;
 
     if (!decode.licence) {
-      setAlerte(
+      alerter(
         `Contenu non reconnu comme une licence : « ${decode.brut.slice(0, 60)} ». ` +
           'Saisissez le numéro de licence à la main.',
       );
@@ -117,19 +123,19 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
       { dejaInscrites, enInscription: enInscription.current },
     );
     if (!placement.ok) {
-      setAlerte(placement.raison);
+      alerter(placement.raison);
       return;
     }
 
     const fiche = parLicence.get(decode.licence);
     const nom = fiche?.name ?? decode.name ?? '';
     if (!fiche && !nom) {
-      setAlerte(
+      alerter(
         `Licence ${decode.licence} inconnue du fichier des licenciés : ` +
           'complétez le nom à la main.',
       );
     } else {
-      setAlerte(null);
+      alerter(null);
     }
 
     const joueur: Scanne = { name: nom, licence: decode.licence, brut: decode.brut, fiche };
@@ -142,7 +148,7 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
     if (placement.complete && aLaVolee) {
       if (suivant.every((j) => j.name.trim())) void inscrire(suivant);
       else
-        setAlerte(
+        alerter(
           'Équipe complète, mais un nom manque : complétez-le puis validez avec « Inscrire l\'équipe ».',
         );
     }
@@ -152,7 +158,7 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
     if (joueurs.length === 0) return;
     // Aucun joueur n'est abandonné en route : on refuse plutôt d'inscrire.
     if (joueurs.some((j) => !j.name.trim())) {
-      setAlerte('Complétez le nom de chaque joueur avant d\'inscrire l\'équipe.');
+      alerter('Complétez le nom de chaque joueur avant d\'inscrire l\'équipe.');
       return;
     }
     const club = joueurs.find((j) => j.fiche?.club)?.fiche?.club;
@@ -164,9 +170,12 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
     const licences = joueurs.flatMap((j) => (j.licence ? [j.licence] : []));
     for (const l of licences) enInscription.current.add(l);
     setEncours([]);
-    // L'alerte se lève au départ, pas au retour : un refus survenu pendant
-    // l'écriture doit rester affiché, sinon il redeviendrait muet.
-    setAlerte(null);
+    // L'alerte reste affichée pendant l'écriture : la lever au départ
+    // raccourcirait la modale sous le pointeur, et le second clic d'un double
+    // clic sur « Inscrire l'équipe » tomberait sur le fond grisé. Au retour, on
+    // ne lève que l'alerte du départ : un refus survenu pendant l'écriture doit
+    // rester affiché, sinon il redeviendrait muet.
+    const alerteAuDepart = versionAlerte.current;
     try {
       // §3.B.2 : le club et le comité appartiennent au joueur, pas à l'équipe —
       // une équipe de national ou de régional réunit des licenciés de clubs et
@@ -191,13 +200,14 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
       // Rien n'est perdu en silence : l'équipe revient à l'écran si la place
       // est libre, sinon ses joueurs sont nommés pour être rescannés.
       setEncours((courant) => (courant.length === 0 ? joueurs : courant));
-      setAlerte(
+      alerter(
         `L'équipe n'a pas pu être inscrite (${e instanceof Error ? e.message : String(e)}) : ` +
           joueurs.map((j) => j.name.trim()).join(', ') +
           '.',
       );
       return;
     }
+    if (versionAlerte.current === alerteAuDepart) alerter(null);
     setInscrites((n) => n + 1);
     setMessage(`Équipe inscrite (${joueurs.length} joueur${joueurs.length > 1 ? 's' : ''}).`);
     champ.current?.focus();
@@ -303,7 +313,13 @@ export function LicenceScanModal({ concours, teams, onClose }: Props) {
               : ''}
           </span>
           {encours.length > 0 && (
-            <button className="btn btn-ghost" onClick={() => setEncours([])}>
+            <button
+              className="btn btn-ghost"
+              onClick={() => {
+                setEncours([]);
+                alerter(null);
+              }}
+            >
               Vider
             </button>
           )}

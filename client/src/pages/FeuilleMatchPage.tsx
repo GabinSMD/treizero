@@ -1,6 +1,6 @@
 import { Lock, Mail, Medal, Printer, Repeat, Save, Trash2, TriangleAlert, X } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { Licencie, Player } from '@shared';
 import {
   BAREME_CDC,
@@ -16,6 +16,11 @@ import {
   parseLicenceQr,
   bilanRencontre,
   empreinteFeuille,
+  FORMATION_FEUILLE,
+  ficheSuivante,
+  fichesDuClub,
+  fileInscriptions,
+  placerScanFeuille,
   libelleEquipeClub,
   partiesVides,
   reinitialiserFiche,
@@ -30,7 +35,7 @@ import {
   type LettreEquipe,
   estMuteExterne,
 } from '@shared';
-import { useFeuilleMatch, useLicencies } from '../db/hooks';
+import { useFeuilleMatch, useFeuillesMatch, useLicencies } from '../db/hooks';
 import { updateFeuilleMatch } from '../db/actions';
 import { exportFeuilleJSON } from '../lib/export';
 import { CameraQr } from '../components/CameraQr';
@@ -52,6 +57,19 @@ import {
   ETAT_MUTATION_LABELS,
   formatDateFr,
 } from '../lib/labels';
+
+/** Fiche qui reçoit les scans : voir `cible` dans `FeuilleMatchPage`. */
+interface Cible {
+  base: FeuilleMatch;
+  /** Composition telle qu'écrite ou à écrire : elle devance la base. */
+  licences: string[];
+  /** Écritures parties et pas encore revenues. */
+  enVol: number;
+  /** Écriture dans la file, pas encore commencée : elle emportera l'état le plus récent. */
+  enAttente: Promise<void> | null;
+  /** Fiche suivante choisie « à la volée », avant que la navigation l'affiche. */
+  chainee: boolean;
+}
 
 /**
  * Feuille de match d'une rencontre de championnat des clubs (manuel §3.E).
@@ -76,6 +94,51 @@ export function FeuilleMatchPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [echange, setEchange] = useState(false);
   const champ = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const feuilles = useFeuillesMatch();
+  const [aLaVolee, setALaVolee] = useState(true);
+
+  /**
+   * Fiche qui reçoit les scans, et sa composition telle qu'elle a été écrite —
+   * elle devance la base tant qu'une écriture est en vol (`enVol`). Les scans
+   * se lisent et s'écrivent ici, jamais depuis `feuille` : deux scans arrivés
+   * avant que la base ait répondu partaient de la même composition, et le
+   * second effaçait le premier.
+   *
+   * Au passage à la fiche suivante (« à la volée »), la cible change **avant**
+   * la navigation (`chainee`) : un scan arrivé pendant la création de la fiche
+   * B va à B, au lieu d'être refusé par A complète.
+   */
+  const cible = useRef<Cible | null>(null);
+  const [, rafraichir] = useState(0);
+  /**
+   * Fiches que l'on vient de quitter, telles qu'elles ont été écrites, tant que
+   * la base ne les a pas relues : leurs joueurs comptent déjà parmi les fiches
+   * sœurs, sinon la relecture du dernier joueur de A entrerait dans B.
+   */
+  const quittees = useRef(new Map<string, FeuilleMatch>());
+  /** Les écritures de la feuille partent l'une après l'autre, dans l'ordre des scans. */
+  const enFile = useRef(fileInscriptions()).current;
+
+  useEffect(() => {
+    const c = cible.current;
+    if (!feuille || !c || c.base.id !== feuille.id) return;
+    c.chainee = false;
+    // Plus rien en vol : la base fait foi, y compris pour un changement venu
+    // d'une autre tablette. Avant, une relecture intermédiaire ramènerait la
+    // cible à une version que les écritures en file ont déjà dépassée.
+    if (c.enVol === 0) {
+      c.base = feuille;
+      c.licences = feuille.licences;
+    }
+    rafraichir((v) => v + 1);
+  }, [feuille]);
+  useEffect(() => {
+    for (const [id, f] of quittees.current) {
+      const relue = feuilles?.find((x) => x.id === id);
+      if (relue && f.licences.every((l) => relue.licences.includes(l))) quittees.current.delete(id);
+    }
+  }, [feuilles]);
 
   if (!feuille) {
     return (
@@ -88,12 +151,67 @@ export function FeuilleMatchPage() {
   }
   const etat = feuille;
 
-  /** Toute modification est écrite tout de suite : la feuille se synchronise. */
-  const maj = (patch: Partial<FeuilleMatch>): void => {
-    void updateFeuilleMatch({ ...etat, ...patch });
+  /** La cible des scans, ramenée à la feuille affichée si l'on a changé de feuille. */
+  const cibleScan = () => {
+    const c = cible.current;
+    if (c && (c.base.id === etat.id || c.chainee)) return c;
+    cible.current = {
+      base: etat,
+      licences: etat.licences,
+      enVol: 0,
+      enAttente: null,
+      chainee: false,
+    };
+    return cible.current;
+  };
+  /** Composition affichée : celle des scans, qui peut devancer la base. */
+  const licences =
+    cible.current && cible.current.base.id === etat.id ? cible.current.licences : etat.licences;
+
+  /**
+   * Écrit la cible `c` telle qu'elle sera au moment de son tour dans la file.
+   * Une écriture déjà en attente de son tour emportera de toute façon l'état
+   * le plus récent : on la rejoint plutôt que d'en empiler une de plus — huit
+   * scans faisaient huit écritures, et la fiche suivante naissait derrière.
+   */
+  const ecrire = (c: Cible): Promise<void> => {
+    rafraichir((v) => v + 1);
+    if (c.enAttente) return c.enAttente;
+    c.enVol += 1;
+    const ecriture = enFile(() => {
+      c.enAttente = null;
+      return updateFeuilleMatch({ ...c.base, licences: c.licences });
+    })
+      .catch((e: unknown) => {
+        setMessage(
+          `La feuille n'a pas pu être enregistrée (${e instanceof Error ? e.message : String(e)}).`,
+        );
+        throw e;
+      })
+      .finally(() => {
+        c.enVol -= 1;
+      });
+    c.enAttente = ecriture;
+    return ecriture;
   };
 
-  const joueurs: Player[] = etat.licences.map((licence) => ({
+  /**
+   * Toute modification est écrite tout de suite : la feuille se synchronise.
+   * Elle passe par la même file que les scans, avec leur composition : sinon
+   * une saisie faite pendant un scan en vol récrivait l'ancienne composition.
+   */
+  const maj = (patch: Partial<FeuilleMatch>): void => {
+    const c = cibleScan();
+    if (c.base.id !== etat.id) {
+      void updateFeuilleMatch({ ...etat, ...patch });
+      return;
+    }
+    c.base = { ...c.base, ...patch };
+    if (patch.licences) c.licences = patch.licences;
+    void ecrire(c).catch(() => undefined);
+  };
+
+  const joueurs: Player[] = licences.map((licence) => ({
     name: parLicence.get(licence)?.name ?? '',
     licence,
     club: parLicence.get(licence)?.club,
@@ -241,31 +359,82 @@ export function FeuilleMatchPage() {
   ].join('\n');
   const lienCourriel = `mailto:${encodeURIComponent(etat.courrielComite.trim())}?subject=${encodeURIComponent(objetCourriel)}&body=${encodeURIComponent(corpsCourriel)}`;
 
-  /** Ajoute un joueur par son numéro de licence (scan, douchette ou saisie). */
+  /**
+   * Ajoute un joueur par son numéro de licence (scan, douchette ou saisie),
+   * dans la limite de la formation (`placerScanFeuille`) : un scan refusé dit
+   * toujours pourquoi. « À la volée », la fiche complète passe la main à la
+   * fiche suivante du club, A → H, créée si besoin (§3.B.2-3.B.3).
+   */
   const ajouter = (contenu: string): void => {
-    // La caméra peut rester ouverte au moment où l'on signe : sa lecture ne
-    // doit pas modifier une feuille verrouillée.
-    if (signee) return;
     const decode = parseLicenceQr(contenu);
     if (!decode?.licence) {
       setMessage(`Contenu non reconnu : « ${contenu.slice(0, 40)} ».`);
       return;
     }
-    if (etat.licences.includes(decode.licence)) {
-      setMessage(`Licence ${decode.licence} déjà dans l'équipe.`);
+    const licence = decode.licence;
+    const c = cibleScan();
+    const placement = placerScanFeuille(
+      c.base,
+      c.licences,
+      licence,
+      fichesDuClub(
+        [...(feuilles ?? []).filter((f) => !quittees.current.has(f.id)), ...quittees.current.values()],
+        c.base,
+      ),
+    );
+    if (!placement.ok) {
+      setMessage(placement.raison);
       return;
     }
-    const fiche = parLicence.get(decode.licence);
+    const fiche = parLicence.get(licence);
+    const inconnue = fiche
+      ? null
+      : `Licence ${licence} inconnue du fichier des licenciés : rien à contrôler pour ce joueur.`;
+    c.licences = [...c.licences, licence];
+    void ecrire(c).catch(() => undefined);
+    setMessage(inconnue);
+
+    if (!placement.complete || !aLaVolee) return;
+    const courante = { ...c.base, licences: c.licences };
+    const suite = ficheSuivante(feuilles ?? [], courante, () => crypto.randomUUID());
+    if (suite.type === 'aucune') {
+      setMessage([inconnue, suite.raison].filter(Boolean).join(' '));
+      return;
+    }
+    quittees.current.set(courante.id, courante);
+    const suivante: Cible = {
+      base: suite.feuille,
+      licences: suite.feuille.licences,
+      enVol: 0,
+      enAttente: null,
+      chainee: true,
+    };
+    cible.current = suivante;
     setMessage(
-      fiche
-        ? null
-        : `Licence ${decode.licence} inconnue du fichier des licenciés : rien à contrôler pour ce joueur.`,
+      [
+        inconnue,
+        `${libelleEquipeClub(courante.equipe, '')} complète (${FORMATION_FEUILLE} joueurs) : ` +
+          `scannez ${libelleEquipeClub(suite.feuille.equipe, '')}.`,
+      ]
+        .filter(Boolean)
+        .join(' '),
     );
-    maj({ licences: [...etat.licences, decode.licence] });
+    const prete = suite.type === 'nouvelle' ? ecrire(suivante) : Promise.resolve();
+    prete.then(
+      () => navigate(`/championnat-clubs/${suite.feuille.id}`),
+      () => {
+        // La fiche suivante n'a pas pu naître : les scans reviennent à la
+        // courante, qui les refusera en le disant (formation complète).
+        if (cible.current === suivante) cible.current = null;
+      },
+    );
   };
 
-  const retirer = (licence: string): void =>
-    maj({ licences: etat.licences.filter((l) => l !== licence) });
+  const retirer = (licence: string): void => {
+    const c = cibleScan();
+    c.licences = c.licences.filter((l) => l !== licence);
+    void ecrire(c).catch(() => undefined);
+  };
 
   return (
     <div className="page championnat-page">
@@ -566,7 +735,15 @@ export function FeuilleMatchPage() {
           autoComplete="off"
         />
         <span className="toolbar-actions">
-          {etat.licences.length > 0 && (
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={aLaVolee}
+              onChange={(e) => setALaVolee(e.target.checked)}
+            />
+            À la volée : passer à l'équipe suivante (A→H) à {FORMATION_FEUILLE} joueurs
+          </label>
+          {licences.length > 0 && (
             <button
               type="button"
               className="btn btn-ghost btn-sm"
@@ -582,7 +759,7 @@ export function FeuilleMatchPage() {
                 // composition laissait les places (qui nomment les joueurs
                 // effacés) et surtout la **signature**, qui certifiait alors une
                 // composition disparue.
-                void updateFeuilleMatch(reinitialiserFiche(etat));
+                maj(reinitialiserFiche(etat));
               }}
             >
               <Trash2 className="ic" aria-hidden /> Réinitialiser {etat.equipe ? `Fiche ${etat.equipe}` : 'la fiche'}
@@ -653,7 +830,7 @@ export function FeuilleMatchPage() {
         </p>
       </div>
 
-      {etat.licences.length === 0 ? (
+      {licences.length === 0 ? (
         <p className="no-print">Scannez les licences de l'équipe pour la contrôler.</p>
       ) : (
         <>
@@ -664,7 +841,7 @@ export function FeuilleMatchPage() {
             }
           >
             {controle.conforme
-              ? `Équipe conforme (${etat.licences.length} joueurs)`
+              ? `Équipe conforme (${licences.length} joueurs)`
               : `Équipe non conforme : ${
                   controle.anomaliesEquipe.map((a) => ANOMALIE_EQUIPE_LABELS[a]).join(', ') ||
                   'voir les joueurs en rouge'
@@ -685,7 +862,7 @@ export function FeuilleMatchPage() {
               </tr>
             </thead>
             <tbody>
-              {etat.licences.map((licence, i) => {
+              {licences.map((licence, i) => {
                 const c = controle.joueurs[i]!;
                 const fiche: Licencie | undefined = parLicence.get(licence);
                 const horsUE = estHorsUE(fiche?.nationalite);
@@ -749,7 +926,7 @@ export function FeuilleMatchPage() {
           </table>
 
           <ul className="print-bilan">
-            <li>Joueurs : {etat.licences.length}</li>
+            <li>Joueurs : {licences.length}/{FORMATION_FEUILLE}</li>
             <li>
               Mutations externes :{' '}
               {joueurs.filter((p) => {

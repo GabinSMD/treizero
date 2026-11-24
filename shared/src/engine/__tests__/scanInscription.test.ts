@@ -110,3 +110,10 @@ describe('file des inscriptions', () => {
     await expect(suivante).resolves.toBe(1);
   });
 });
+
+describe('consigne d une équipe complète', () => {
+  it('l appelant peut dire quoi faire à la place de « inscrivez-la »', () => {
+    const r = placerScan(['1'], '2', 1, { ...vide, siComplete: (l) => `retirez-en un pour ${l}.` });
+    expect(!r.ok && r.raison).toBe('Équipe complète (1 joueur) : retirez-en un pour 2.');
+  });
+});

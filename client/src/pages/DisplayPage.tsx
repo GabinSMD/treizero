@@ -8,6 +8,7 @@ import { formateurTerrain, type LibelleTerrain } from '../lib/terrain';
 import { BracketView } from './tabs/BracketTab';
 import { SideLabel } from './tabs/RondesTab';
 import { StandingsTable } from '../components/StandingsTable';
+import { AnnoncesParties } from '../components/AnnoncesParties';
 import { teamDisplayName } from '../components/TeamLabel';
 import { TirRanking } from '../components/TirRanking';
 import {
@@ -74,6 +75,7 @@ export function DisplayPage() {
             ← Gestion
           </Link>
         </div>
+        <AnnoncesParties concours={concours} teams={teams} poules={poules} matches={matches} />
       </header>
 
       {championTeam && (

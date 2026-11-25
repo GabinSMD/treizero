@@ -6965,3 +6965,54 @@ h2 {
     width: 100%;
   }
 }
+
+/* ---------------- Annonce vocale des parties (écran d'affichage) ------- */
+
+.display-head .annonces {
+  flex-basis: 100%;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.annonces-boutons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.display-head .annonces .btn {
+  color: #f2f5fb;
+}
+
+.display-head .annonces .btn:disabled {
+  opacity: 0.5;
+}
+
+.display-head .annonces .annonces-actif {
+  background: #1d3d9c;
+  border-color: #93b4ff;
+}
+
+.annonces-etat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0;
+  font-size: 0.95rem;
+  color: #9aa7c9;
+}
+
+.annonces-etat .ic {
+  vertical-align: -0.15em;
+}
+
+.annonces-alerte {
+  color: #ffd27a;
+}
+
+/* La dernière annonce reste écrite : utile à qui n'a pas entendu. */
+.annonces-derniere {
+  color: #f2f5fb;
+  font-size: 1.15rem;
+  font-weight: 600;
+}

@@ -376,6 +376,20 @@ export const FAQ: FaqEntry[] = [
     action: { label: 'Ouvrir l\'affichage', path: '/concours/:id/affichage', needsConcours: true },
   },
   {
+    id: 'annonces-vocales',
+    category: 'Affichage',
+    question: 'L\'écran peut-il appeler les parties à voix haute ?',
+    keywords: ['annonce', 'annoncer', 'appel', 'appeler', 'voix', 'micro', 'haut-parleur', 'son', 'vocal'],
+    steps: [
+      'Sur l\'écran d\'affichage, cliquez sur « Annoncer les parties » : le navigateur n\'autorise le son qu\'après ce clic, il est donc à refaire après chaque rechargement.',
+      'Chaque partie qui reçoit ses deux équipes est appelée par les numéros et le terrain, par exemple « Poule 3, barrage : équipe 12 contre équipe 34, terrain 5. » Les parties du tableau et des rondes aussi.',
+      'Les annonces passent l\'une après l\'autre. « Répéter la dernière annonce » la relit, et elle reste écrite à l\'écran.',
+      'Une partie déjà appelée ne l\'est plus, même après un rechargement. À la première activation, les parties déjà en cours ne sont pas relues.',
+      'La voix est celle de l\'appareil : choisissez-en une française installée, qui marche sans réseau. L\'écran prévient si aucune ne l\'est.',
+    ],
+    action: { label: 'Ouvrir l\'affichage', path: '/concours/:id/affichage', needsConcours: true },
+  },
+  {
     id: 'imprimer',
     parcours: 'impressions',
     category: 'Affichage',
